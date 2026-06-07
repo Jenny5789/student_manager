@@ -3,6 +3,8 @@ venv/
 
 # 데이터베이스
 *.db
+*.db-shm
+*.db-wal
 
 # Python 캐시
 __pycache__/
