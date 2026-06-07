@@ -31,6 +31,7 @@ class StudentTab(QWidget):
 
         self._update_search_nums()
         self._update_add_nums()
+        self.table.cellChanged.connect(self._on_cell_changed)
 
     # ── 검색 ─────────────────────────────────────────────────
     def _search_group(self):
@@ -210,7 +211,6 @@ class StudentTab(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.cellChanged.connect(self._on_cell_changed)
         return self.table
 
     # ── 하단 바 ──────────────────────────────────────────────
@@ -264,6 +264,7 @@ class StudentTab(QWidget):
 
     def _fill_table(self, students):
         self.table.blockSignals(True)
+        self.table.setUpdatesEnabled(False)
         self.table.setRowCount(len(students))
         for r, s in enumerate(students):
             for c, val in enumerate(s[:8]):
@@ -276,6 +277,7 @@ class StudentTab(QWidget):
             note_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             self.table.setItem(r, 8, note_item)
         self.lbl_count.setText(f"총 {len(students)}명")
+        self.table.setUpdatesEnabled(True)
         self.table.blockSignals(False)
 
     def _on_cell_changed(self, row, col):
