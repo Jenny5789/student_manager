@@ -1,5 +1,17 @@
 # 가상환경
 venv/
+.python-packages/
+
+# 빌드·배포 산출물
+build/
+dist/
+release-build/
+release-build-v1/
+release-dist/
+
+# 로컬 캐시·테스트 데이터
+.mpl-cache/
+.test-data/
 
 # 데이터베이스
 *.db

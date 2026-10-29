@@ -1,5 +1,8 @@
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QTabWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QComboBox, QListView, QMainWindow, QWidget, QVBoxLayout, QLabel, QTabWidget
+)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont
 
 from views.student_tab import StudentTab
 from views.score_tab import ScoreTab
@@ -14,6 +17,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1100, 720)
         self._build_ui()
         self._apply_styles()
+        self._apply_combo_popup_fonts()
 
     # ── UI 구성 ──────────────────────────────────────────────
     def _build_ui(self):
@@ -34,18 +38,80 @@ class MainWindow(QMainWindow):
         self.student_tab = StudentTab(self.db)
         self.score_tab   = ScoreTab(self.db)
         self.stats_tab   = StatsTab(self.db)
+        self.score_tab.scores_saved.connect(self.student_tab.apply_score_updates)
 
         self.tabs.addTab(self.student_tab, "👤  학생 관리")
         self.tabs.addTab(self.score_tab,   "📝  성적 관리")
         self.tabs.addTab(self.stats_tab,   "📊  통계 & 시각화")
+        self._active_tab_index = self.tabs.currentIndex()
+        self._restoring_tab = False
+        self._allow_tab_change = False
+        self._pending_tab_index = None
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         layout.addWidget(self.tabs)
 
     def _on_tab_changed(self, idx):
+        if self._restoring_tab:
+            return
+
+        if self._allow_tab_change:
+            self._allow_tab_change = False
+        elif (self._active_tab_index == 1 and idx != 1
+              and self.score_tab.has_unsaved_changes()):
+            # QTabWidget의 currentChanged 신호 안에서 모달 창을 열면 Windows가
+            # 잠시 응답 없음으로 판단할 수 있어, 먼저 탭을 되돌린 뒤 다음 이벤트에서 묻는다.
+            self._restoring_tab = True
+            self.tabs.setCurrentIndex(self._active_tab_index)
+            self._restoring_tab = False
+            self._pending_tab_index = idx
+            QTimer.singleShot(0, self._confirm_tab_change)
+            return
+
+        self._active_tab_index = idx
         # 통계 탭으로 전환 시 자동 갱신
         if idx == 2:
             self.stats_tab.refresh()
+
+    def _confirm_tab_change(self):
+        target_index = self._pending_tab_index
+        self._pending_tab_index = None
+        if target_index is None:
+            return
+        if self.score_tab.confirm_unsaved_changes("탭 이동"):
+            self._allow_tab_change = True
+            self.tabs.setCurrentIndex(target_index)
+
+    def closeEvent(self, event):
+        if self.score_tab.confirm_unsaved_changes("종료"):
+            event.accept()
+        else:
+            event.ignore()
+
+    def _apply_combo_popup_fonts(self):
+        """Windows 기본 팝업 대신 글꼴과 높이가 고정된 목록을 사용한다."""
+        for combo in self.findChildren(QComboBox):
+            view = QListView(combo)
+            view.setFont(QFont("Malgun Gothic", 12))
+            view.setStyleSheet("""
+                QListView {
+                    font: 12pt "Malgun Gothic";
+                    background: #ffffff;
+                    border: 1px solid #d0d7de;
+                    outline: none;
+                }
+                QListView::item {
+                    min-height: 32px;
+                    padding: 4px 10px;
+                }
+                QListView::item:selected {
+                    background: #dbeafe;
+                    color: #0969da;
+                }
+            """)
+            combo.setView(view)
+            combo.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            combo.setMaxVisibleItems(4)
 
     # ── 전역 스타일시트 ──────────────────────────────────────
     def _apply_styles(self):
@@ -166,6 +232,8 @@ class MainWindow(QMainWindow):
                     border: 1px solid #d0d7de;
                     selection-background-color: #dbeafe;
                     selection-color: #0969da;
+                    font-size: 13px;
+                    padding: 6px 10px;
                 }
 
                 /* ── 테이블 ── */

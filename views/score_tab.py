@@ -1,14 +1,26 @@
+import sqlite3
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QLabel, QGroupBox, QComboBox,
     QMessageBox, QLineEdit, QDialog
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
 
+class ScoreItem(QTableWidgetItem):
+    def __lt__(self, other):
+        try:
+            return float(self.text()) < float(other.text())
+        except ValueError:
+            return self.text() < other.text()
+
+
 class ScoreTab(QWidget):
+    scores_saved = pyqtSignal(object)
+
     def __init__(self, db):
         super().__init__()
         self.db = db
@@ -51,7 +63,8 @@ class ScoreTab(QWidget):
 
         self.combo_grade.setFixedWidth(90)
         self.combo_grade.addItem("학년", 0)
-        self.combo_grade.addItems(["1학년", "2학년", "3학년"])
+        for grade in range(1, 4):
+            self.combo_grade.addItem(f"{grade}학년", grade)
         self.combo_grade.currentIndexChanged.connect(self._on_grade_changed)
 
         self.combo_class = QComboBox()
@@ -95,11 +108,8 @@ class ScoreTab(QWidget):
         self.combo_num.clear()
         self.combo_num.addItem("번호", 0)
         class_num = self.combo_class.currentData()
-        if class_num:
-            grade = self.combo_grade.currentIndex() + 1
-            if not grade:
-                self._load_all()
-                return
+        grade = self.combo_grade.currentData()
+        if grade and class_num:
             nums = self.db.get_existing_nums(grade, class_num)
             for n in nums:
                 self.combo_num.addItem(f"{n}번", n)
@@ -188,6 +198,9 @@ class ScoreTab(QWidget):
         num       = self.combo_num.currentData()
 
         if not grade:
+            if class_num:
+                QMessageBox.warning(self, "검색 조건", "반으로 검색하려면 학년을 선택하세요.")
+                return
             self._load_all()
             return
 
@@ -214,6 +227,7 @@ class ScoreTab(QWidget):
     def _search_by_name(self):
         name = self.search_input.text().strip()
         if not name:
+            self._load_students()
             return
         students = self.db.search_students(name)
         self._fill_table(students)
@@ -223,6 +237,7 @@ class ScoreTab(QWidget):
         self.table.blockSignals(True)
         self.table.setRowCount(len(students))
         for r, s in enumerate(students):
+            pending = self._modified.get(tuple(s[:3]), {})
             for c in range(4):
                 item = QTableWidgetItem(str(s[c]))
                 item.setTextAlignment(Qt.AlignCenter)
@@ -230,11 +245,22 @@ class ScoreTab(QWidget):
                 self.table.setItem(r, c, item)
 
             for c in range(4, 7):
-                item = QTableWidgetItem(str(s[c]))
+                subject = {4: "korean", 5: "english", 6: "math"}[c]
+                item = ScoreItem(str(pending.get(subject, s[c])))
                 item.setTextAlignment(Qt.AlignCenter)
+                if subject in pending:
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+                    item.setForeground(QColor("#1565c0"))
                 self.table.setItem(r, c, item)
 
-            avg_item = QTableWidgetItem(f"{s[7]:.1f}")
+            try:
+                scores = [int(self.table.item(r, c).text()) for c in (4, 5, 6)]
+                avg_text = f"{sum(scores) / 3:.1f}" if all(0 <= v <= 100 for v in scores) else "입력 확인"
+            except ValueError:
+                avg_text = "입력 확인"
+            avg_item = ScoreItem(avg_text)
             avg_item.setTextAlignment(Qt.AlignCenter)
             avg_item.setFlags(avg_item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(r, 7, avg_item)
@@ -264,12 +290,13 @@ class ScoreTab(QWidget):
             return
 
         # 국어/영어/수학 → bold + 파란색
-        font = item.font()
-        font.setBold(True)
-        item.setFont(font)
-        item.setForeground(QColor("#1565c0"))
+        self.table.blockSignals(True)
 
         try:
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            item.setForeground(QColor("#1565c0"))
             col_name = {4: "korean", 5: "english", 6: "math"}[item.column()]
             key = (grade, class_num, num)
             if key not in self._modified:
@@ -282,12 +309,14 @@ class ScoreTab(QWidget):
             kor  = int(self.table.item(row, 4).text())
             eng  = int(self.table.item(row, 5).text())
             math = int(self.table.item(row, 6).text())
+            if not all(0 <= v <= 100 for v in (kor, eng, math)):
+                raise ValueError
             avg  = (kor + eng + math) / 3
-            self.table.blockSignals(True)
             self.table.item(row, 7).setText(f"{avg:.1f}")
-            self.table.blockSignals(False)
         except (ValueError, AttributeError):
-            pass
+            self.table.item(row, 7).setText("입력 확인")
+        finally:
+            self.table.blockSignals(False)
 
     # ── 헤더 클릭 정렬 ───────────────────────────────────────
     def _on_header_clicked(self, col):
@@ -377,36 +406,78 @@ class ScoreTab(QWidget):
         dlg.exec_()
 
     # ── 저장 ────────────────────────────────────────────────
-    def _save_scores(self):
-        error_rows = []
-        for r in range(self.table.rowCount()):
-            grade     = int(self.table.item(r, 0).text())
-            class_num = int(self.table.item(r, 1).text())
-            num       = int(self.table.item(r, 2).text())
-            try:
-                kor  = int(self.table.item(r, 4).text())
-                eng  = int(self.table.item(r, 5).text())
-                math = int(self.table.item(r, 6).text())
-                if not (0 <= kor <= 100 and 0 <= eng <= 100 and 0 <= math <= 100):
-                    raise ValueError
-                self.db.update_scores(grade, class_num, num, kor, eng, math)
+    def has_unsaved_changes(self):
+        return bool(self._modified)
 
-                for c in (4, 5, 6):
-                    item = self.table.item(r, c)
+    def confirm_unsaved_changes(self, action):
+        """탭 이동이나 종료 전에 저장되지 않은 성적을 처리한다."""
+        if not self.has_unsaved_changes():
+            return True
+
+        message_box = QMessageBox(self)
+        message_box.setIcon(QMessageBox.Warning)
+        message_box.setWindowTitle("미저장 성적")
+        message_box.setText("저장하지 않은 성적 변경이 있습니다.")
+        message_box.setInformativeText("저장한 뒤 계속하거나, 변경 내용을 버릴 수 있습니다.")
+        save_button = message_box.addButton("저장", QMessageBox.AcceptRole)
+        discard_button = message_box.addButton(
+            "저장하지 않고 닫기" if action == "종료" else "저장하지 않고 이동",
+            QMessageBox.DestructiveRole,
+        )
+        message_box.addButton("취소", QMessageBox.RejectRole)
+        message_box.exec_()
+
+        if message_box.clickedButton() == save_button:
+            return self._save_scores()
+        return message_box.clickedButton() == discard_button
+
+    def _save_scores(self):
+        if not self._modified:
+            QMessageBox.information(self, "성적 저장", "저장할 성적 변경이 없습니다.")
+            return True
+
+        changes = {}
+        errors = []
+        for key, data in self._modified.items():
+            try:
+                fields = {subject: int(data[subject]) for subject in
+                          ("korean", "english", "math") if subject in data}
+                if any(not 0 <= value <= 100 for value in fields.values()):
+                    raise ValueError
+                changes[key] = fields
+            except ValueError:
+                errors.append(f"{key[0]}학년 {key[1]}반 {key[2]}번")
+
+        if errors:
+            QMessageBox.warning(
+                self, "저장 오류",
+                "다음 학생의 점수를 확인하세요: " + ", ".join(errors) + "\n"
+                "점수는 0~100 사이의 정수만 입력 가능합니다. 아무 성적도 저장하지 않았습니다."
+            )
+            return False
+
+        try:
+            self.db.update_scores_batch(changes)
+        except (sqlite3.Error, ValueError) as exc:
+            QMessageBox.warning(self, "저장 실패", f"성적을 저장하지 못했습니다. 수정 내용은 유지됩니다.\n{exc}")
+            return False
+
+        count = len(changes)
+        self._modified.clear()
+        self.table.blockSignals(True)
+        try:
+            for row in range(self.table.rowCount()):
+                key = tuple(int(self.table.item(row, c).text()) for c in range(3))
+                if key not in changes:
+                    continue
+                for column in (4, 5, 6):
+                    item = self.table.item(row, column)
                     font = item.font()
                     font.setBold(False)
                     item.setFont(font)
                     item.setForeground(QColor("#000000"))
-
-            except (ValueError, AttributeError):
-                error_rows.append(r + 1)
-
-        if error_rows:
-            QMessageBox.warning(
-                self, "저장 오류",
-                f"다음 행에 오류가 있습니다: {error_rows}\n"
-                "점수는 0~100 사이의 정수만 입력 가능합니다."
-            )
-        else:
-            QMessageBox.information(self, "저장 완료", "✅  성적이 저장되었습니다.")
-            self._modified.clear()
+        finally:
+            self.table.blockSignals(False)
+        self.scores_saved.emit(list(changes))
+        QMessageBox.information(self, "저장 완료", f"✅  검색 결과 밖의 수정 내용을 포함해 {count}명의 성적을 저장했습니다.")
+        return True

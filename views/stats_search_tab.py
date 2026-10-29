@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QGroupBox, QComboBox, QLabel, QPushButton, QLineEdit
+    QGroupBox, QComboBox, QLabel, QMessageBox, QPushButton, QLineEdit
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
@@ -27,12 +27,14 @@ class ScoreSearchTab(QWidget):
         self.ws_grade.addItem("전체", 0)
         for g in range(1, 4):
             self.ws_grade.addItem(f"{g}학년", g)
+        self.ws_grade.currentIndexChanged.connect(self._on_grade_changed)
 
         self.ws_class = QComboBox()
         self.ws_class.setFixedWidth(100)
         self.ws_class.addItem("전체", 0)
         for c in range(1, 9):
             self.ws_class.addItem(f"{c}반", c)
+        self.ws_class.setEnabled(False)
 
         self.ws_subject = QComboBox()
         self.ws_subject.setFixedWidth(100)
@@ -89,6 +91,12 @@ class ScoreSearchTab(QWidget):
         layout.addWidget(self.ws_table, 1)
         layout.addWidget(self.ws_lbl)
 
+    def _on_grade_changed(self):
+        has_grade = bool(self.ws_grade.currentData())
+        self.ws_class.setEnabled(has_grade)
+        if not has_grade:
+            self.ws_class.setCurrentIndex(0)
+
     def _search_score(self):
         grade     = self.ws_grade.currentData()
         class_num = self.ws_class.currentData()
@@ -96,17 +104,22 @@ class ScoreSearchTab(QWidget):
         try:
             threshold = int(self.ws_score.text())
         except ValueError:
-            threshold = 60
+            QMessageBox.warning(self, "입력 오류", "점수는 0~100 사이의 정수로 입력하세요.")
+            return
+        if not 0 <= threshold <= 100:
+            QMessageBox.warning(self, "입력 오류", "점수는 0~100 사이의 정수로 입력하세요.")
+            return
+        if not grade:
+            QMessageBox.information(self, "조회 조건", "학년을 선택하세요.")
+            return
 
         col_map = {"국어": "korean", "영어": "english", "수학": "math", "평균": "average"}
         col = col_map[subject]
 
-        if grade and class_num:
+        if class_num:
             students = self.db.get_students_by_class(grade, class_num)
-        elif grade:
-            students = self.db.get_students_by_grade(grade)
         else:
-            students = self.db.get_all_students()
+            students = self.db.get_students_by_grade(grade)
 
         col_idx   = {"korean": 4, "english": 5, "math": 6, "average": 7}[col]
         condition = self.ws_condition.currentText()

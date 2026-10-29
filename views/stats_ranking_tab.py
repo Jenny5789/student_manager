@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QGroupBox, QComboBox, QLabel, QPushButton
+    QGroupBox, QComboBox, QLabel, QMessageBox, QPushButton
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
@@ -12,7 +12,7 @@ class RankingTab(QWidget):
         super().__init__()
         self.db = db
         self._build_ui()
-        self._update_ranking()
+        self._show_search_prompt()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -28,12 +28,14 @@ class RankingTab(QWidget):
         self.rk_grade.addItem("전체", 0)
         for g in range(1, 4):
             self.rk_grade.addItem(f"{g}학년", g)
+        self.rk_grade.currentIndexChanged.connect(self._on_grade_changed)
 
         self.rk_class = QComboBox()
         self.rk_class.setFixedWidth(100)
         self.rk_class.addItem("전체", 0)
         for c in range(1, 9):
             self.rk_class.addItem(f"{c}반", c)
+        self.rk_class.setEnabled(False)
 
         self.rk_subject = QComboBox()
         self.rk_subject.setFixedWidth(110)
@@ -85,26 +87,41 @@ class RankingTab(QWidget):
         layout.addWidget(self.rk_table, 1)
         layout.addWidget(self.rk_lbl)
 
+    def _on_grade_changed(self):
+        has_grade = bool(self.rk_grade.currentData())
+        self.rk_class.setEnabled(has_grade)
+        if not has_grade:
+            self.rk_class.setCurrentIndex(0)
+
+    def _show_search_prompt(self):
+        self.rk_table.setRowCount(0)
+        self.rk_lbl.setText("학년과 조건을 선택한 뒤 조회하세요.")
+
     def _update_ranking(self):
-            grade     = self.rk_grade.currentData()
-            class_num = self.rk_class.currentData()
-            subject   = self.rk_subject.currentText()
-            order     = self.rk_order.currentText()
+        grade     = self.rk_grade.currentData()
+        class_num = self.rk_class.currentData()
+        subject   = self.rk_subject.currentText()
+        order     = self.rk_order.currentText()
 
-            if grade and class_num:
-                students = self.db.get_students_by_class(grade, class_num)
-            elif grade:
-                students = self.db.get_students_by_grade(grade)
-            else:
-                students = self.db.get_all_students()
+        if not grade:
+            self._show_search_prompt()
+            QMessageBox.information(self, "조회 조건", "학년을 선택하세요.")
+            return
 
-            col_map = {"전체 평균": 7, "국어": 4, "영어": 5, "수학": 6}
-            col_idx = col_map[subject]
+        if class_num:
+            students = self.db.get_students_by_class(grade, class_num)
+        else:
+            students = self.db.get_students_by_grade(grade)
 
-            reverse  = order == "내림차순"
-            students = sorted(students, key=lambda s: s[col_idx], reverse=reverse)
+        col_map = {"전체 평균": 7, "국어": 4, "영어": 5, "수학": 6}
+        col_idx = col_map[subject]
 
-            self.rk_table.blockSignals(True)
+        reverse  = order == "내림차순"
+        students = sorted(students, key=lambda s: s[col_idx], reverse=reverse)
+
+        self.rk_table.blockSignals(True)
+        self.rk_table.setUpdatesEnabled(False)
+        try:
             self.rk_table.setRowCount(len(students))
             prev_val  = None
             prev_rank = 0
@@ -129,8 +146,11 @@ class RankingTab(QWidget):
                     elif rank == 3:
                         item.setBackground(QColor("#eff6ff"))
                     self.rk_table.setItem(r, c, item)
+        finally:
             self.rk_table.blockSignals(False)
-            self.rk_lbl.setText(f"총 {len(students)}명")
+            self.rk_table.setUpdatesEnabled(True)
+        self.rk_lbl.setText(f"총 {len(students)}명")
 
     def refresh(self):
-        self._update_ranking()
+        if self.rk_grade.currentData():
+            self._update_ranking()

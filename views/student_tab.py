@@ -233,6 +233,32 @@ class StudentTab(QWidget):
         self.search_input.clear()
         self._fill_table(self.db.get_all_students())
 
+    def apply_score_updates(self, student_keys):
+        """성적 저장 후 현재 표에 보이는 학생 행만 갱신한다."""
+        rows_by_key = {}
+        for row in range(self.table.rowCount()):
+            try:
+                key = tuple(int(self.table.item(row, col).text()) for col in range(3))
+            except (AttributeError, ValueError):
+                continue
+            rows_by_key[key] = row
+
+        self.table.blockSignals(True)
+        try:
+            for key in student_keys:
+                row = rows_by_key.get(tuple(key))
+                if row is None:
+                    continue
+                student = self.db.get_student(*key)
+                if not student:
+                    continue
+                values = student[0]
+                for col in range(4, 8):
+                    text = f"{values[col]:.1f}" if col == 7 else str(values[col])
+                    self.table.item(row, col).setText(text)
+        finally:
+            self.table.blockSignals(False)
+
     def _do_search(self):
         name = self.search_input.text().strip()
         if name:
@@ -302,8 +328,14 @@ class StudentTab(QWidget):
         grade     = self.inp_grade.currentData()
         class_num = self.inp_class.currentData()
         num       = self.inp_num.currentData()
+        if not grade or not class_num:
+            QMessageBox.warning(self, "입력 오류", "학년과 반을 선택하세요.")
+            return
         if num is None:
             QMessageBox.warning(self, "입력 오류", "추가 가능한 번호가 없습니다.")
+            return
+        if not num:
+            QMessageBox.warning(self, "입력 오류", "번호를 선택하세요.")
             return
         ok, msg = self.db.add_student(grade, class_num, num, name)
         if ok:

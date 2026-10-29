@@ -1,6 +1,8 @@
 import sqlite3
 import random
 import os
+import sys
+from pathlib import Path
 
 LAST_NAME = [
     "김", "이", "박", "최", "정", "강", "조", "윤", "장", "임",
@@ -18,9 +20,19 @@ FIRST_NAME = [
 class DBManager:
     def __init__(self, db_path=None):
         if db_path is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            db_path = os.path.join(base_dir, "student.db")
-        self.db_path = db_path
+            db_path = self._default_db_path()
+        self.db_path = str(db_path)
+
+    @staticmethod
+    def _default_db_path():
+        """개발 중에는 프로젝트 DB를, 패키지 실행 시에는 사용자 DB를 사용한다."""
+        if getattr(sys, "frozen", False):
+            local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+            data_dir = local_app_data / "StudentManager"
+            data_dir.mkdir(parents=True, exist_ok=True)
+            return data_dir / "student.db"
+
+        return Path(__file__).resolve().parent / "student.db"
 
     def get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -139,6 +151,32 @@ class DBManager:
                 (note, grade, class_num, num)
             )
             return cur.rowcount > 0
+
+    def update_scores_batch(self, changes):
+        """수정된 과목만 반영하며, 실패하면 전체 성적 변경을 롤백한다."""
+        conn = self.get_connection()
+        try:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                for key, fields in changes.items():
+                    row = conn.execute(
+                        "SELECT korean,english,math FROM students "
+                        "WHERE grade=? AND class_num=? AND num=?", key
+                    ).fetchone()
+                    if row is None:
+                        raise ValueError(f"학생이 존재하지 않습니다: {key}")
+                    scores = [fields.get(subject, row[i]) for i, subject in
+                              enumerate(("korean", "english", "math"))]
+                    if any(type(value) is not int or not 0 <= value <= 100
+                           for value in scores):
+                        raise ValueError("점수는 0~100 사이의 정수여야 합니다.")
+                    conn.execute(
+                        "UPDATE students SET korean=?,english=?,math=?,average=? "
+                        "WHERE grade=? AND class_num=? AND num=?",
+                        (*scores, sum(scores) / 3, *key)
+                    )
+        finally:
+            conn.close()
 
     # ── 번호 조회 ────────────────────────────────────────────
     def get_last_num(self, grade, class_num):
