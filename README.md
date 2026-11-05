@@ -1,4 +1,4 @@
-# Student Manager &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<small><small><small>2026.06</small></small></small>
+# Student Manager &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<sup><sub>2026.06</sub></sup>
 
 Python, PyQt5, SQLite로 만든 학생 정보·성적 관리 데스크톱 앱.
 
