@@ -1,4 +1,8 @@
-# Student Manager
+# Student Manager &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<small><small><small>2026.06</small></small></small>
+
+Python, PyQt5, SQLite로 만든 학생 정보·성적 관리 데스크톱 앱.
+
+학생·성적 CRUD, 조건별 검색, 성적 순위, 학급별 평균 그래프를 제공하고, 성적 일괄 저장은 트랜잭션으로 묶어 오류가 나면 전체를 되돌림.
 
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)
@@ -6,154 +10,102 @@
 ![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=python&logoColor=white)
 ![unittest](https://img.shields.io/badge/unittest-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-## 핵심 구현
+<img src="images/tab2.png" width="600" alt="성적 관리 화면">
 
-- **Python GUI 개발:** PyQt5 버튼·표·탭 이벤트 기반 학생 관리 화면 구현
-- **SQL CRUD와 데이터 무결성:** SQLite 학생·성적 저장, 성적 일괄 저장 시 트랜잭션·롤백 적용
-- **입력 검증과 오류 처리:** 필수 입력값·0~100 점수 범위 검사, 저장 실패 시 수정 내용 유지
-- **상태 관리:** 학생 키 `(학년, 반, 번호)` 기준 저장 전 성적 수정 내용 관리
-- **문제 분석과 성능 개선:** 표 전체 재생성에 따른 화면 멈춤 로그 확인 후 변경 행만 갱신
-- **테스트:** 테스트 DB 분리 후 저장·검색·정렬·롤백·탭 이동 시나리오 검증
+## 핵심 코드
 
-## 프로젝트 소개
+### 수정 내용 모아 두기
 
-- **목적:** 학생 정보·성적 통합 관리 및 학급별 성적 현황 비교 데스크톱 애플리케이션
-- **구현 범위:** 학생·성적 CRUD, 조건별 검색, 성적 순위, 평균 그래프
-- **구현 중점:** 화면·DB 처리 분리, 입력 검증, 저장 오류 복구, 화면 갱신 방식 개선
-- **개발 기술:** Python · PyQt5 · SQLite · Matplotlib
-- **개발 도구:** Visual Studio Code
+[views/score_tab.py](views/score_tab.py)
 
-## 사용 기술
+고친 점수를 `(학년, 반, 번호)` 키의 딕셔너리에 모아 두어, 검색 조건을 바꿔도 수정 내용이 유지되고 저장할 때 한 번에 반영.
 
-| 기술 | 활용 |
-| --- | --- |
-| Python | 클래스별 역할 분리, 입력 검증, 데이터 처리 |
-| PyQt5 | 신호·슬롯 기반 검색·편집·탭 이동 처리 |
-| SQLite | 학생·성적 CRUD, 조건 검색, 트랜잭션 |
-| Matplotlib | 학급별 과목 평균 그래프 |
-| unittest | 별도 테스트 DB 활용 저장·오류 처리 검증 |
-
-## Python·SQL 적용 근거
-
-| 기초 개념 | 관련 코드 | 구현 내용 |
-| --- | --- | --- |
-| 클래스와 객체 | `DBManager`, `StudentTab`, `ScoreTab` | DB 처리와 화면별 기능 클래스 분리 |
-| 함수 분리 | `views/`, `database/db_manager.py` | 검색·저장·입력 검증·화면 갱신 메서드 단위 구성 |
-| 이벤트 기반 처리 | PyQt5 신호·슬롯 | 버튼 클릭·표 셀 수정·탭 이동 시 검색·저장·안내 실행 |
-| 딕셔너리 자료구조 | 성적 관리의 수정 목록 | `(학년, 반, 번호)` 키로 저장 전 수정 과목·값 관리 |
-| 조건문·예외 처리 | 학생 추가·성적 저장 | 필수 입력·점수 범위·저장 실패 검사 및 안내 |
-| SQL CRUD | `DBManager` | 학생 추가·조회·수정·삭제 및 조건 검색 수행 |
-| 기본키 | `students` 테이블 | `grade`, `class_num`, `num` 복합키로 학생 식별 |
-| 트랜잭션과 롤백 | `update_scores_batch()` | 성적 저장 중 오류 시 전체 변경 취소 |
-| 테스트 | `tests/` | 저장·검색·정렬·롤백·탭 이동 시나리오 테스트 DB 검증 |
-
-## 주요 기능
-
-### 학생 관리
-
-- 학년·반·번호 또는 이름 검색
-- 학생 추가·삭제 및 비고 수정
-- 필수 입력 누락·공백 이름 검사
-
-<img src="images/tab0.png" alt="학생 관리 화면" width="100%">
-
-### 성적 관리
-
-- 국어·영어·수학 점수 편집 및 일괄 저장
-- 0~100 정수 입력 검증 및 평균 계산
-- 과목 점수·평균 숫자 기준 정렬
-- 검색 조건 변경 후에도 수정 내용 유지
-- 미저장 상태에서 탭 이동·종료 시 저장 여부 확인
-
-<img src="images/tab2.png" alt="성적 관리 화면" width="100%">
-
-### 통계·시각화
-
-- 선택 학년의 학급별 과목 평균 비교
-- 학년·반·과목·점수 조건별 학생 조회
-- 과목별 성적 순위 및 정렬 조건 선택
-
-<img src="images/tab3.png" alt="학급별 성적 비교 그래프" width="100%">
-
-<details>
-<summary>추가 화면 보기</summary>
-
-#### 학생 추가 후 성적 입력
-
-<img src="images/tab1.png" alt="성적 입력 창" width="100%">
-
-#### 조건별 학생 조회
-
-<img src="images/tab4.png" alt="성적별 학생 조회 화면" width="100%">
-
-#### 성적 순위
-
-<img src="images/tab5.png" alt="성적 순위 화면" width="100%">
-
-</details>
-
-## 구현 흐름
-
-### 화면과 DB 처리 분리
-
-- 화면 클래스: 사용자 입력·이벤트 처리·조회 결과 표시 담당
-- `DBManager`: SQLite 연결·CRUD·통계 조회 담당
-- `(학년, 반, 번호)` 복합 기본키로 학생 식별
-
-```text
-사용자 입력 → 입력 검증 → DB 저장·조회 → 표·그래프 갱신
+```python
+key = (grade, class_num, num)
+if key not in self._modified:
+    self._modified[key] = {
+        "name": self.table.item(row, 3).text(),
+        "grade": grade, "class_num": class_num, "num": num
+    }
+self._modified[key][col_name] = item.text()   # 수정한 과목만 기록
 ```
 
-### 성적 일괄 저장과 오류 복구
+### 성적 일괄 저장과 롤백
 
-- 학생 키별 변경 내용 보관 후 조회 결과와 저장 대상 분리
-- 저장 전 수정 목록 전체 점수 유효성 검사
-- 단일 트랜잭션으로 수정 과목·평균 저장
-- 오류 시 전체 롤백 및 수정 내용 유지
-- 저장 성공 시 변경 목록 초기화 및 해당 학생 정보 반영
+[database/db_manager.py](database/db_manager.py)
+
+여러 학생의 성적을 하나의 트랜잭션으로 저장해, 한 명이라도 오류가 나면 전체를 되돌림.
+
+```python
+def update_scores_batch(self, changes):
+    """수정된 과목만 반영하며, 실패하면 전체 성적 변경을 롤백한다."""
+    conn = self.get_connection()
+    try:
+        with conn:                                   # 오류 시 자동 롤백
+            conn.execute("BEGIN IMMEDIATE")
+            for key, fields in changes.items():
+                row = conn.execute(
+                    "SELECT korean,english,math FROM students "
+                    "WHERE grade=? AND class_num=? AND num=?", key
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"학생이 존재하지 않습니다: {key}")
+                # 수정하지 않은 과목은 DB 점수를 그대로 사용
+                scores = [fields.get(subject, row[i]) for i, subject in
+                          enumerate(("korean", "english", "math"))]
+                if any(type(value) is not int or not 0 <= value <= 100
+                       for value in scores):
+                    raise ValueError("점수는 0~100 사이의 정수여야 합니다.")
+                conn.execute(
+                    "UPDATE students SET korean=?,english=?,math=?,average=? "
+                    "WHERE grade=? AND class_num=? AND num=?",
+                    (*scores, sum(scores) / 3, *key)
+                )
+    finally:
+        conn.close()
+```
 
 ## 문제 해결
 
-<img src="images/problem-solving-process.png" alt="Student Manager 문제 해결과 개선 과정" width="100%">
+<img src="images/problem-solving-process.png" width="100%" alt="문제 해결과 개선 과정">
 
-### 필수 입력 누락 차단
+| 문제 | 개선 |
+|---|---|
+| 학년·반을 고르지 않아도 학생 추가됨 | 저장 전 학년·반·번호와 이름 검사 |
+| 저장 중 오류가 나면 일부 성적만 저장됨 | 단일 트랜잭션과 전체 롤백 ([핵심 코드](#성적-일괄-저장과-롤백)) |
+| 저장·탭 이동 시 화면 멈춤 (`debug.log`로 675명 × 9열 표 재생성 확인) | 전체 표 재생성을 없애고 바뀐 학생 행만 갱신 |
 
-- **문제:** 학년·반 미선택 상태에서도 학생 추가 가능
-- **개선:** 저장 전 학년·반·번호 선택 여부 및 이름 검사
-- **확인:** 누락 입력 차단 및 정상 입력 저장·조회 확인
+## 주요 기능
 
-### 일부 성적만 저장되는 문제 개선
+| 기능 | 설명 |
+|---|---|
+| 학생 관리 | 학년·반·번호 또는 이름 검색, 학생 추가·삭제, 비고 수정<br>필수 입력 누락·공백 이름 검사 |
+| 성적 관리 | 국어·영어·수학 점수 편집과 일괄 저장, 0~100 정수 검증, 평균 계산<br>점수·평균 기준 정렬, 미저장 상태에서 탭 이동·종료 시 저장 여부 확인 |
+| 학급별 비교 | 선택 학년의 학급별 과목 평균 그래프(Matplotlib) |
+| 조건별 조회 | 학년·반·과목·점수 조건으로 학생 조회 |
+| 성적 순위 | 과목별 성적 순위와 정렬 조건 선택 |
+| 코드 구조 | 화면(`views/`)은 입력과 표시만, `DBManager`는 DB 처리만 담당<br>저장·검색·정렬·롤백·탭 이동은 별도 테스트 DB로 unittest 검증(`tests/`) |
 
-- **문제:** 여러 학생 저장 중 오류 발생 시 일부 성적만 저장
-- **개선:** 일괄 저장에 단일 트랜잭션 적용 및 실패 시 전체 롤백
-- **확인:** 잘못된 점수·삭제된 학생 포함 시 기존 성적 유지
+<details>
+<summary>전체 화면 보기</summary>
 
-### 화면 멈춤 원인 분석과 갱신 방식 개선
+| 학생 관리 | 성적 입력 창 |
+|---|---|
+| <img src="images/tab0.png" width="400" alt="학생 관리"> | <img src="images/tab1.png" width="400" alt="성적 입력 창"> |
 
-- **문제:** 저장·탭 이동 중 전체 학생 표 재생성으로 응답 지연
-- **분석:** `debug.log`에서 675명 × 9열 표 항목 재생성 확인
-- **개선:** 저장 후 전체 표 재생성 제거, 변경 학생 행만 갱신
-- **확인:** 저장 후 학생 관리 탭 이동 및 변경 행 반영 확인
+| 학급별 비교 그래프 | 조건별 조회 |
+|---|---|
+| <img src="images/tab3.png" width="400" alt="학급별 비교 그래프"> | <img src="images/tab4.png" width="400" alt="조건별 조회"> |
 
-## 실행 방법
+| 성적 순위 | |
+|---|---|
+| <img src="images/tab5.png" width="400" alt="성적 순위"> | |
 
-```powershell
-git clone https://github.com/Jenny5789/student_manager.git
-cd student_manager
+</details>
 
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+## 파일 구조
 
-python -m pip install -r requirements.txt
-python main.py
 ```
-
-- DB 위치: `database/student.db`
-- 학생 테이블 비어 있을 경우 초기 샘플 데이터 자동 생성
-
-## 프로젝트 구조
-
-```text
 student_manager/
 ├── main.py                  # 앱 시작점
 ├── requirements.txt         # 실행 의존성
@@ -167,5 +119,23 @@ student_manager/
 │   ├── stats_search_tab.py  # 조건별 조회
 │   └── stats_ranking_tab.py # 성적 순위
 ├── tests/                   # 저장·검색·상태 관리 검증
-└── images/                  # 화면 이미지
+└── images/                  # README 스크린샷
 ```
+
+## 실행 방법
+
+Python 3.x.
+
+```powershell
+git clone https://github.com/Jenny5789/student_manager.git
+cd student_manager
+
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+python -m pip install -r requirements.txt
+python main.py
+```
+
+- DB 위치: `database/student.db`
+- 학생 테이블이 비어 있으면 샘플 데이터 자동 생성
