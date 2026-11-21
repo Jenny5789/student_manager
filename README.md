@@ -2,7 +2,7 @@
 
 # 학생 관리 프로그램
 
-학생 정보·성적 CRUD, 조건별 검색, 성적 순위, 학급별 평균 그래프를 제공하는 **데스크톱 앱**
+DB CRUD·트랜잭션·단위 테스트를 적용한 **PyQt5 데스크톱 앱**
 
 `Python` · `PyQt5` · `SQLite` · `Matplotlib` · `unittest`
 
